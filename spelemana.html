@@ -1,0 +1,2634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>ПИСЕЦ — THE PEE PROTOCOL</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{width:100%;height:100%;overflow:hidden;background:#000;}
+body{
+font-family:'Courier New',Consolas,monospace;
+color:#e6e6e6;user-select:none;-webkit-user-select:none;
+cursor:default;
+}
+canvas{display:block;}
+
+/* ---------------- HUD ---------------- */
+#hud{position:fixed;inset:0;pointer-events:none;z-index:10;}
+
+#crosshair{
+position:absolute;left:50%;top:50%;width:6px;height:6px;
+margin-left:-3px;margin-top:-3px;border-radius:50%;
+background:rgba(255,255,255,.75);
+box-shadow:0 0 6px rgba(0,0,0,.9);
+transition:transform .08s ease;
+}
+#crosshair.peeing{transform:scale(1.8);background:#ffe066;}
+
+#topLeft{
+position:absolute;left:26px;top:22px;
+text-shadow:0 2px 6px #000;
+}
+.label{
+font-size:11px;letter-spacing:3px;color:#a9b3bf;margin-bottom:5px;
+}
+#hpBar{
+width:250px;height:16px;border:2px solid rgba(255,255,255,.35);
+background:rgba(0,0,0,.55);position:relative;overflow:hidden;
+}
+#hpFill{
+height:100%;width:100%;
+background:linear-gradient(90deg,#c0142b,#ff3b3b 60%,#ff7a5c);
+transition:width .18s ease-out;
+box-shadow:0 0 12px rgba(255,50,50,.7) inset;
+}
+#hpText{
+font-size:13px;margin-top:5px;color:#e8e8e8;letter-spacing:1px;
+}
+
+#topRight{
+position:absolute;right:26px;top:22px;text-align:right;
+text-shadow:0 2px 6px #000;max-width:340px;
+}
+#levelName{font-size:16px;letter-spacing:4px;color:#ffd27a;}
+#levelSub{font-size:11px;letter-spacing:2px;color:#8e9aa8;margin-top:3px;}
+#objective{
+font-size:11px;letter-spacing:1px;color:#9fb0c0;margin-top:10px;
+line-height:1.6;
+}
+
+#peeWrap{
+position:absolute;left:50%;bottom:34px;transform:translateX(-50%);
+width:min(560px,72vw);text-align:center;
+}
+#peeLabel{
+font-size:11px;letter-spacing:5px;color:#d8c46a;margin-bottom:6px;
+text-shadow:0 2px 6px #000;
+}
+#peeBar{
+height:18px;border:2px solid rgba(255,255,255,.3);
+background:rgba(0,0,0,.6);position:relative;overflow:hidden;
+}
+#peeFill{
+height:100%;width:0%;
+background:linear-gradient(90deg,#8a7a20,#ffe066 50%,#fff5b0);
+box-shadow:0 0 18px rgba(255,224,102,.8);
+transition:width .06s linear;
+}
+#peeBar::after{
+content:'';position:absolute;inset:0;
+background:repeating-linear-gradient(90deg,rgba(0,0,0,.35) 0 2px,transparent 2px 14px);
+pointer-events:none;
+}
+
+#dodgeWrap{
+position:absolute;left:26px;bottom:34px;width:120px;
+}
+#dodgeLabel{font-size:10px;letter-spacing:3px;color:#8e9aa8;margin-bottom:5px;}
+#dodgeBar{
+height:8px;border:1px solid rgba(255,255,255,.25);background:rgba(0,0,0,.55);
+}
+#dodgeFill{height:100%;width:100%;background:#4fc3f7;transition:width .1s linear;}
+
+#bossWrap{
+position:absolute;left:50%;top:26px;transform:translateX(-50%);
+width:min(700px,80vw);text-align:center;
+}
+#bossName{
+font-size:14px;letter-spacing:6px;color:#ff4d4d;margin-bottom:6px;
+text-shadow:0 0 14px rgba(255,0,0,.8);
+}
+#bossBar{
+height:20px;border:2px solid rgba(255,60,60,.6);
+background:rgba(0,0,0,.7);
+}
+#bossFill{
+height:100%;width:100%;
+background:linear-gradient(90deg,#4a0010,#c0142b 40%,#ff4444);
+transition:width .12s linear;
+}
+
+#vignette{
+position:absolute;inset:0;pointer-events:none;
+background:radial-gradient(ellipse at center,transparent 42%,rgba(0,0,0,.72) 100%);
+}
+#hurtFlash{
+position:absolute;inset:0;pointer-events:none;opacity:0;
+background:radial-gradient(ellipse at center,rgba(255,0,0,0) 35%,rgba(180,0,0,.85) 100%);
+transition:opacity .12s ease-out;
+}
+#peeTint{
+position:absolute;inset:0;pointer-events:none;opacity:0;
+background:radial-gradient(ellipse at 50% 120%,rgba(255,224,102,.28),transparent 62%);
+transition:opacity .18s ease;
+}
+
+/* ---------------- JUMPSCARE ---------------- */
+#jumpscare{
+position:fixed;inset:0;z-index:60;display:flex;
+align-items:center;justify-content:center;
+background:rgba(0,0,0,.92);pointer-events:none;
+}
+#jumpscare.hidden{display:none;}
+#jumpscare svg{width:min(90vmin,900px);height:min(90vmin,900px);}
+@keyframes jsZoom{
+0%{transform:scale(.45) rotate(-4deg);filter:blur(6px) brightness(.4);}
+18%{transform:scale(1.35) rotate(3deg);filter:blur(0) brightness(1.5);}
+36%{transform:scale(1.05) rotate(-2deg);filter:brightness(1.1);}
+55%{transform:scale(1.5) rotate(2deg);filter:brightness(1.8) contrast(1.4);}
+75%{transform:scale(1.15) rotate(-1deg);filter:brightness(1);}
+100%{transform:scale(1.9) rotate(0deg);filter:brightness(2.2) blur(3px);opacity:0;}
+}
+
+/* ---------------- SCREENS ---------------- */
+#screen{
+position:fixed;inset:0;z-index:80;display:flex;
+align-items:center;justify-content:center;
+background:radial-gradient(ellipse at center,#12161c 0%,#000 78%);
+text-align:center;padding:30px;
+}
+#screen.hidden{display:none;}
+.panel{max-width:760px;}
+.title{
+font-size:clamp(34px,7vw,74px);letter-spacing:14px;color:#e8e8e8;
+text-shadow:0 0 30px rgba(255,60,60,.5),0 6px 0 #2a0000;
+margin-bottom:6px;
+}
+.subtitle{
+font-size:clamp(11px,1.6vw,15px);letter-spacing:7px;color:#7d8894;
+margin-bottom:34px;
+}
+.controls{
+font-size:13px;line-height:2.1;color:#a8b4c0;letter-spacing:1px;
+margin-bottom:34px;
+}
+.controls b{color:#ffd27a;letter-spacing:2px;}
+.btn{
+pointer-events:auto;cursor:pointer;
+display:inline-block;padding:16px 52px;
+border:2px solid #ffd27a;color:#ffd27a;
+letter-spacing:7px;font-size:16px;font-family:inherit;
+background:rgba(255,210,122,.06);
+transition:all .16s ease;
+}
+.btn:hover{background:#ffd27a;color:#101418;box-shadow:0 0 40px rgba(255,210,122,.6);}
+.dead .title{color:#ff3b3b;text-shadow:0 0 40px rgba(255,0,0,.8);}
+.win .title{color:#7dffb0;text-shadow:0 0 40px rgba(0,255,140,.7);}
+.small{font-size:11px;color:#5d6672;letter-spacing:2px;margin-top:26px;}
+
+#fade{
+position:fixed;inset:0;z-index:70;background:#000;opacity:0;
+pointer-events:none;transition:opacity .45s ease;
+}
+#fade.on{opacity:1;}
+</style>
+</head>
+<body>
+
+<!-- ================= HUD ================= -->
+<div id="hud">
+<div id="crosshair"></div>
+
+<div id="topLeft">
+<div class="label">ЗДОРОВЬЕ / HEALTH</div>
+<div id="hpBar"><div id="hpFill"></div></div>
+<div id="hpText">30 / 30</div>
+</div>
+
+<div id="topRight">
+<div id="levelName">—</div>
+<div id="levelSub">—</div>
+<div id="objective">—</div>
+</div>
+
+<div id="bossWrap" style="display:none;">
+<div id="bossName">МЕТРО-МАТКА</div>
+<div id="bossBar"><div id="bossFill"></div></div>
+</div>
+
+<div id="peeWrap">
+<div id="peeLabel">ПИСЕМЕТР</div>
+<div id="peeBar"><div id="peeFill"></div></div>
+</div>
+
+<div id="dodgeWrap">
+<div id="dodgeLabel">РЫВОК [SPACE]</div>
+<div id="dodgeBar"><div id="dodgeFill"></div></div>
+</div>
+
+<div id="peeTint"></div>
+<div id="hurtFlash"></div>
+<div id="vignette"></div>
+</div>
+
+<!-- ================= JUMPSCARE ================= -->
+<div id="jumpscare" class="hidden">
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<radialGradient id="skinG" cx="50%" cy="42%" r="62%">
+<stop offset="0%" stop-color="#efe7d6"/>
+<stop offset="62%" stop-color="#c9bea8"/>
+<stop offset="100%" stop-color="#5c5346"/>
+</radialGradient>
+<radialGradient id="eyeG" cx="50%" cy="50%" r="50%">
+<stop offset="0%" stop-color="#ffffff"/>
+<stop offset="70%" stop-color="#cfcfcf"/>
+<stop offset="100%" stop-color="#2b2b2b"/>
+</radialGradient>
+<radialGradient id="pupG" cx="50%" cy="50%" r="50%">
+<stop offset="0%" stop-color="#ff2020"/>
+<stop offset="60%" stop-color="#7a0000"/>
+<stop offset="100%" stop-color="#180000"/>
+</radialGradient>
+</defs>
+<!-- head -->
+<ellipse cx="100" cy="104" rx="66" ry="86" fill="url(#skinG)"/>
+<!-- eye sockets -->
+<ellipse cx="72" cy="80" rx="21" ry="26" fill="#0a0a0a"/>
+<ellipse cx="128" cy="80" rx="21" ry="26" fill="#0a0a0a"/>
+<!-- eyeballs -->
+<ellipse cx="72" cy="80" rx="16" ry="20" fill="url(#eyeG)"/>
+<ellipse cx="128" cy="80" rx="16" ry="20" fill="url(#eyeG)"/>
+<circle cx="72" cy="80" r="8" fill="url(#pupG)"/>
+<circle cx="128" cy="80" r="8" fill="url(#pupG)"/>
+<circle cx="69" cy="76" r="2.4" fill="#fff"/>
+<circle cx="125" cy="76" r="2.4" fill="#fff"/>
+<!-- nose -->
+<path d="M100 92 L92 116 L108 116 Z" fill="#1a1611" opacity="0.85"/>
+<!-- screaming mouth -->
+<ellipse cx="100" cy="152" rx="34" ry="30" fill="#080606"/>
+<ellipse cx="100" cy="160" rx="26" ry="20" fill="#2a0000"/>
+<!-- teeth -->
+<g fill="#efe9dc">
+<rect x="72" y="126" width="7" height="13" rx="1.5"/>
+<rect x="81" y="124" width="7" height="16" rx="1.5"/>
+<rect x="90" y="123" width="7" height="17" rx="1.5"/>
+<rect x="99" y="123" width="7" height="17" rx="1.5"/>
+<rect x="108" y="124" width="7" height="16" rx="1.5"/>
+<rect x="117" y="126" width="7" height="13" rx="1.5"/>
+<rect x="72" y="168" width="7" height="13" rx="1.5"/>
+<rect x="81" y="166" width="7" height="15" rx="1.5"/>
+<rect x="90" y="165" width="7" height="16" rx="1.5"/>
+<rect x="99" y="165" width="7" height="16" rx="1.5"/>
+<rect x="108" y="166" width="7" height="15" rx="1.5"/>
+<rect x="117" y="168" width="7" height="13" rx="1.5"/>
+</g>
+<!-- cracks -->
+<path d="M40 46 L58 68 L46 92" stroke="#5c5346" stroke-width="1.6" fill="none" opacity="0.7"/>
+<path d="M160 40 L146 66 L158 88" stroke="#5c5346" stroke-width="1.6" fill="none" opacity="0.7"/>
+<path d="M100 18 L96 40 L104 52" stroke="#5c5346" stroke-width="1.4" fill="none" opacity="0.55"/>
+</svg>
+</div>
+
+<!-- ================= SCREENS ================= -->
+<div id="screen">
+<div class="panel" id="screenPanel">
+<div class="title">ПИСЕЦ</div>
+<div class="subtitle">THE PEE PROTOCOL</div>
+<div class="controls">
+<b>WASD</b> — движение (move)<br>
+<b>MOUSE</b> — обзор (look)<br>
+<b>HOLD LEFT MOUSE</b> — ССАТЬ (pee / attack)<br>
+<b>SHIFT</b> — бег (sprint) &nbsp;•&nbsp; <b>SPACE</b> — рывок (dodge)<br>
+<b>ESC</b> — пауза (pause)
+</div>
+<div class="btn" id="startBtn">НАЧАТЬ</div>
+<div class="small">30 HP • 4 DISTRICTS • 1 METRO STATION • 1 MOTHER</div>
+</div>
+</div>
+
+<div id="fade"></div>
+
+<!-- ================= THREE.JS ================= -->
+<script type="importmap">
+{
+"imports": {
+"three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+}
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+
+/* ==========================================================================
+0. UTILITIES
+========================================================================== */
+
+const clamp = (v, a, b) => v < a ? a : (v > b ? b : v);
+const lerp = (a, b, t) => a + (b - a) * t;
+const TAU = Math.PI * 2;
+
+let _seed = 987654321;
+function srand() {
+_seed = (_seed * 1664525 + 1013904223) >>> 0;
+return _seed / 4294967296;
+}
+function rnd(a, b) { return a + srand() * (b - a); }
+function rndInt(a, b) { return Math.floor(rnd(a, b + 1)); }
+function pick(arr) { return arr[Math.floor(srand() * arr.length)]; }
+function dist2D(ax, az, bx, bz) { return Math.hypot(ax - bx, az - bz); }
+
+function hexRgb(hex) {
+return { r: (hex >> 16) & 255, g: (hex >> 8) & 255, b: hex & 255 };
+}
+
+/* ==========================================================================
+1. PROCEDURAL TEXTURE FACTORY
+========================================================================== */
+
+const textureRegistry = []; // disposed on level change
+
+function makeNoiseCanvas(size, baseHex, variance) {
+const c = document.createElement('canvas');
+c.width = c.height = size;
+const ctx = c.getContext('2d');
+const img = ctx.createImageData(size, size);
+const b = hexRgb(baseHex);
+const d = img.data;
+for (let i = 0, p = 0; i < size * size; i++, p += 4) {
+const n = (Math.random() - 0.5) * variance;
+d[p] = clamp(b.r + n, 0, 255);
+d[p + 1] = clamp(b.g + n, 0, 255);
+d[p + 2] = clamp(b.b + n, 0, 255);
+d[p + 3] = 255;
+}
+ctx.putImageData(img, 0, 0);
+return c;
+}
+
+function addGrime(canvas, count, alpha, r, g, bl) {
+const ctx = canvas.getContext('2d');
+const s = canvas.width;
+for (let i = 0; i < count; i++) {
+const x = Math.random() * s;
+const y = Math.random() * s;
+const rad = Math.random() * s * 0.16 + s * 0.02;
+const grd = ctx.createRadialGradient(x, y, 0, x, y, rad);
+grd.addColorStop(0, `rgba(${r},${g},${bl},${alpha})`);
+grd.addColorStop(1, `rgba(${r},${g},${bl},0)`);
+ctx.fillStyle = grd;
+ctx.beginPath();
+ctx.arc(x, y, rad, 0, TAU);
+ctx.fill();
+}
+}
+
+function addCracks(canvas, count, color) {
+const ctx = canvas.getContext('2d');
+const s = canvas.width;
+ctx.strokeStyle = color;
+for (let i = 0; i < count; i++) {
+ctx.lineWidth = Math.random() * 1.4 + 0.4;
+ctx.beginPath();
+let x = Math.random() * s;
+let y = Math.random() * s;
+ctx.moveTo(x, y);
+const steps = rndInt(3, 7);
+for (let j = 0; j < steps; j++) {
+x += (Math.random() - 0.5) * s * 0.18;
+y += (Math.random() - 0.5) * s * 0.18;
+ctx.lineTo(x, y);
+}
+ctx.stroke();
+}
+}
+
+function addBrickPattern(canvas, brickColor, mortarColor) {
+const ctx = canvas.getContext('2d');
+const s = canvas.width;
+const bh = s / 16;
+const bw = s / 8;
+ctx.fillStyle = mortarColor;
+ctx.fillRect(0, 0, s, s);
+ctx.fillStyle = brickColor;
+for (let row = 0; row < 16; row++) {
+const offset = (row % 2) * (bw / 2);
+for (let col = -1; col < 9; col++) {
+ctx.fillRect(col * bw + offset + 1.5, row * bh + 1.5, bw - 3, bh - 3);
+}
+}
+}
+
+function addTilePattern(canvas, tileSize, lineColor, lineWidth) {
+const ctx = canvas.getContext('2d');
+const s = canvas.width;
+ctx.strokeStyle = lineColor;
+ctx.lineWidth = lineWidth;
+for (let i = 0; i <= s; i += tileSize) {
+ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, s); ctx.stroke();
+ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(s, i); ctx.stroke();
+}
+}
+
+function addWindows(canvas, cols, rows, windowColor, litColor, litChance) {
+const ctx = canvas.getContext('2d');
+const s = canvas.width;
+const cw = s / cols;
+const ch = s / rows;
+const wW = cw * 0.46;
+const wH = ch * 0.5;
+for (let r = 0; r < rows; r++) {
+for (let c = 0; c < cols; c++) {
+const x = c * cw + (cw - wW) / 2;
+const y = r * ch + (ch - wH) / 2;
+const lit = Math.random() < litChance;
+ctx.fillStyle = lit ? litColor : windowColor;
+ctx.fillRect(x, y, wW, wH);
+// frame
+ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+ctx.lineWidth = Math.max(1, s / 320);
+ctx.strokeRect(x, y, wW, wH);
+ctx.beginPath();
+ctx.moveTo(x + wW / 2, y);
+ctx.lineTo(x + wW / 2, y + wH);
+ctx.stroke();
+if (lit) {
+ctx.fillStyle = 'rgba(255,220,150,0.09)';
+ctx.fillRect(x - wW * 0.25, y - wH * 0.25, wW * 1.5, wH * 1.5);
+}
+}
+}
+}
+
+function makeTexture(canvas, rx, ry, srgb = true) {
+const t = new THREE.CanvasTexture(canvas);
+t.wrapS = t.wrapT = THREE.RepeatWrapping;
+t.repeat.set(rx, ry);
+t.anisotropy = 4;
+if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+textureRegistry.push(t);
+return t;
+}
+
+/* ==========================================================================
+2. RENDERER / SCENE / CAMERA
+========================================================================== */
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.08, 900);
+camera.rotation.order = 'YXZ';
+
+const renderer = new THREE.WebGLRenderer({
+antialias: true,
+powerPreference: 'high-performance',
+stencil: false
+});
+renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+
+addEventListener('resize', () => {
+camera.aspect = innerWidth / innerHeight;
+camera.updateProjectionMatrix();
+renderer.setSize(innerWidth, innerHeight);
+});
+
+/* ==========================================================================
+3. SHARED GEOMETRY (never disposed — reused forever)
+========================================================================== */
+
+const GEO = {
+sphere: new THREE.SphereGeometry(1, 14, 10),
+sphereLo:new THREE.SphereGeometry(1, 8, 6),
+box: new THREE.BoxGeometry(1, 1, 1),
+cyl: new THREE.CylinderGeometry(1, 1, 1, 12),
+cylLo: new THREE.CylinderGeometry(1, 1, 1, 6),
+cone: new THREE.ConeGeometry(1, 1, 10),
+plane: new THREE.PlaneGeometry(1, 1),
+torus: new THREE.TorusGeometry(1, 0.25, 8, 16)
+};
+
+/* ==========================================================================
+4. GAME STATE
+========================================================================== */
+
+const CFG = {
+playerHeight: 1.66,
+playerRadius: 0.42,
+walkSpeed: 5.1,
+sprintSpeed: 8.8,
+peeSlowFactor: 0.52,
+accel: 13.5,
+sensitivity: 0.0021,
+dodgeSpeed: 18.0,
+dodgeDuration: 0.20,
+dodgeCooldown: 0.85,
+dodgeIFrames: 0.42,
+hitIFrames: 0.95,
+maxHP: 30,
+jumpscareEvery: 40,
+bossMaxHP: 300,
+peeDPS: 1.0,
+enemyPeeDPS: 3.2
+};
+
+const player = {
+pos: new THREE.Vector3(0, 0, 0),
+vel: new THREE.Vector3(),
+yaw: 0,
+pitch: 0,
+hp: CFG.maxHP,
+invuln: 0,
+dodgeTimer: 0,
+dodgeCd: 0,
+dodgeDir: new THREE.Vector3(0, 0, -1),
+peeing: false,
+peeCharge: 0,
+peeGoal: 10,
+bobPhase: 0,
+cameraRoll: 0,
+fov: 75
+};
+
+let running = false;
+let paused = false;
+let pointerLocked = false;
+let levelIndex = 0;
+let levelLength = 340;
+let bossActive = false;
+let boss = null;
+let jumpscareTimer = 0;
+let shakeAmount = 0;
+let deathTimer = 0;
+let transitioning = false;
+
+const world = new THREE.Group();
+scene.add(world);
+
+let colliders = [];
+let lamps = [];
+let levelLights = [];
+let levelMats = [];
+let matCache = new Map();
+let enemies = [];
+let pickups = [];
+let sunLight = null;
+
+const keys = Object.create(null);
+
+/* ==========================================================================
+5. AUDIO ENGINE (procedural WebAudio)
+========================================================================== */
+
+let audioCtx = null;
+let masterGain = null;
+let peeNoiseGain = null;
+let peeNoiseFilter = null;
+
+function initAudio() {
+if (audioCtx) return;
+try {
+audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+masterGain = audioCtx.createGain();
+masterGain.gain.value = 0.55;
+masterGain.connect(audioCtx.destination);
+} catch (e) {
+audioCtx = null;
+}
+}
+
+function makeNoiseBuffer(seconds) {
+const sr = audioCtx.sampleRate;
+const len = Math.floor(sr * seconds);
+const buf = audioCtx.createBuffer(1, len, sr);
+const d = buf.getChannelData(0);
+for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+return buf;
+}
+
+function ensurePeeAudio() {
+if (!audioCtx || peeNoiseGain) return;
+const src = audioCtx.createBufferSource();
+src.buffer = makeNoiseBuffer(2);
+src.loop = true;
+
+peeNoiseFilter = audioCtx.createBiquadFilter();
+peeNoiseFilter.type = 'bandpass';
+peeNoiseFilter.frequency.value = 1400;
+peeNoiseFilter.Q.value = 0.7;
+
+peeNoiseGain = audioCtx.createGain();
+peeNoiseGain.gain.value = 0;
+
+src.connect(peeNoiseFilter);
+peeNoiseFilter.connect(peeNoiseGain);
+peeNoiseGain.connect(masterGain);
+src.start();
+}
+
+function setPeeAudio(on) {
+if (!audioCtx) return;
+ensurePeeAudio();
+if (!peeNoiseGain) return;
+const t = audioCtx.currentTime;
+peeNoiseGain.gain.cancelScheduledValues(t);
+peeNoiseGain.gain.linearRampToValueAtTime(on ? 0.22 : 0.0, t + 0.07);
+}
+
+function sfxTone(freq, dur, type = 'square', vol = 0.2, slideTo = null) {
+if (!audioCtx) return;
+const o = audioCtx.createOscillator();
+const g = audioCtx.createGain();
+o.type = type;
+o.frequency.setValueAtTime(freq, audioCtx.currentTime);
+if (slideTo !== null) {
+o.frequency.exponentialRampToValueAtTime(Math.max(20, slideTo), audioCtx.currentTime + dur);
+}
+g.gain.setValueAtTime(vol, audioCtx.currentTime);
+g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + dur);
+o.connect(g);
+g.connect(masterGain);
+o.start();
+o.stop(audioCtx.currentTime + dur + 0.02);
+}
+
+function sfxNoise(dur, vol, freq, q) {
+if (!audioCtx) return;
+const src = audioCtx.createBufferSource();
+src.buffer = makeNoiseBuffer(dur + 0.05);
+const f = audioCtx.createBiquadFilter();
+f.type = 'bandpass';
+f.frequency.value = freq;
+f.Q.value = q;
+const g = audioCtx.createGain();
+g.gain.setValueAtTime(vol, audioCtx.currentTime);
+g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + dur);
+src.connect(f);
+f.connect(g);
+g.connect(masterGain);
+src.start();
+}
+
+function sfxHurt() { sfxTone(220, 0.22, 'sawtooth', 0.30, 60); sfxNoise(0.16, 0.28, 700, 1.2); }
+function sfxPickup() { sfxTone(520, 0.10, 'sine', 0.22); setTimeout(() => sfxTone(880, 0.16, 'sine', 0.22), 90); }
+function sfxDodge() { sfxNoise(0.18, 0.20, 2200, 0.8); }
+function sfxKill() { sfxTone(140, 0.20, 'square', 0.22, 40); sfxNoise(0.22, 0.22, 420, 0.9); }
+function sfxLevel() { sfxTone(300, 0.3, 'sine', 0.25, 900); }
+
+function sfxJumpscare() {
+if (!audioCtx) return;
+// screaming cluster
+for (let i = 0; i < 6; i++) {
+const o = audioCtx.createOscillator();
+const g = audioCtx.createGain();
+o.type = i % 2 === 0 ? 'sawtooth' : 'square';
+const base = 180 + Math.random() * 900;
+o.frequency.setValueAtTime(base, audioCtx.currentTime);
+o.frequency.exponentialRampToValueAtTime(base * (0.25 + Math.random()), audioCtx.currentTime + 0.85);
+g.gain.setValueAtTime(0.11, audioCtx.currentTime);
+g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.9);
+o.connect(g); g.connect(masterGain);
+o.start(); o.stop(audioCtx.currentTime + 0.95);
+}
+sfxNoise(0.7, 0.55, 900, 0.5);
+sfxNoise(0.5, 0.40, 180, 0.7);
+}
+
+/* ==========================================================================
+6. MATERIAL HELPERS
+========================================================================== */
+
+function matCached(key, factory) {
+let m = matCache.get(key);
+if (!m) {
+m = factory();
+matCache.set(key, m);
+levelMats.push(m);
+}
+return m;
+}
+
+function stdMat(params) {
+const m = new THREE.MeshStandardMaterial(params);
+levelMats.push(m);
+return m;
+}
+
+/* ==========================================================================
+7. LEVEL DEFINITIONS
+========================================================================== */
+
+const LEVELS = [
+{
+name: 'МИКРОРАЙОН №7',
+sub: 'KHRUSCHYOVKA DISTRICT — 06:40',
+objective: 'HOLD LMB to fill the PEE METER. Reach the metro tunnel at the far end.',
+length: 340,
+skyColor: 0x8e9aa8,
+fogColor: 0x93a1af,
+fogNear: 34,
+fogFar: 185,
+hemiSky: 0xc8d6e4, hemiGround: 0x55534b, hemiInt: 1.25,
+ambColor: 0x8697a8, ambInt: 0.42,
+sunColor: 0xe6edf5, sunInt: 1.15,
+sun: true,
+peeGoal: 10,
+enemyCount: 15,
+enemyTypes: ['pillbug', 'pillbug', 'tapeworm'],
+groundHex: 0x6c6d66,
+sidewalkHex: 0x83837b,
+buildingHues: [0x9c9c93, 0x8e9089, 0xa9a69c, 0x81837e],
+windowDark: '#242a31',
+windowLit: '#ffcf86',
+litChance: 0.13,
+heals: 2,
+lampColor: 0xfff0c0,
+lampIntensity: 34
+},
+{
+name: 'ЗАВОД «КРАСНЫЙ МОЛОТ»',
+sub: 'INDUSTRIAL ZONE — 19:12',
+objective: 'The factory never stopped. Neither did the things inside it.',
+length: 385,
+skyColor: 0x3d2a22,
+fogColor: 0x4a2f22,
+fogNear: 22,
+fogFar: 150,
+hemiSky: 0x8f5a3a, hemiGround: 0x2a2018, hemiInt: 0.85,
+ambColor: 0x7a5030, ambInt: 0.55,
+sunColor: 0xff8a3a, sunInt: 0.85,
+sun: true,
+peeGoal: 14,
+enemyCount: 18,
+enemyTypes: ['pillbug', 'centipede', 'tapeworm', 'pillbug'],
+groundHex: 0x4a4038,
+sidewalkHex: 0x5a5048,
+buildingHues: [0x6a4a32, 0x7a3e26, 0x50382a, 0x8a5a34],
+windowDark: '#1a1410',
+windowLit: '#ffb04a',
+litChance: 0.22,
+heals: 2,
+lampColor: 0xffa040,
+lampIntensity: 40
+},
+{
+name: 'КАНАЛИЗАЦИЯ',
+sub: 'SEWER CATHEDRAL — 03:58',
+objective: 'Something is crawling in the water. Keep moving.',
+length: 420,
+skyColor: 0x0d1512,
+fogColor: 0x14211c,
+fogNear: 14,
+fogFar: 105,
+hemiSky: 0x3e6a55, hemiGround: 0x0f1a16, hemiInt: 0.85,
+ambColor: 0x4a7a60, ambInt: 0.60,
+sunColor: 0x66ffaa, sunInt: 0.0,
+sun: false,
+peeGoal: 18,
+enemyCount: 22,
+enemyTypes: ['centipede', 'tapeworm', 'centipede', 'pillbug'],
+groundHex: 0x2a3a32,
+sidewalkHex: 0x35463c,
+buildingHues: [0x354a3e, 0x2a3a32, 0x40564a, 0x1f2c26],
+windowDark: '#0a1210',
+windowLit: '#66ffb0',
+litChance: 0.30,
+heals: 3,
+lampColor: 0x7dffb0,
+lampIntensity: 46
+},
+{
+name: 'СТАНЦИЯ «ГЛУБОКАЯ»',
+sub: 'METRO STATION — 04:44 (NO TRAINS)',
+objective: 'The MATRIX waits at the end of the platform. Pee on it until it dies.',
+length: 300,
+skyColor: 0x07080a,
+fogColor: 0x0a0d10,
+fogNear: 18,
+fogFar: 130,
+hemiSky: 0x5a6a7a, hemiGround: 0x101418, hemiInt: 0.80,
+ambColor: 0x5a6a7a, ambInt: 0.55,
+sunColor: 0xffffff, sunInt: 0.0,
+sun: false,
+peeGoal: 999,
+enemyCount: 20,
+enemyTypes: ['centipede', 'pillbug', 'tapeworm'],
+groundHex: 0x3a3f45,
+sidewalkHex: 0x4a5058,
+buildingHues: [0x4a5058, 0x3a3f45, 0x5a6068],
+windowDark: '#0a0d10',
+windowLit: '#ffdd88',
+litChance: 0.4,
+heals: 3,
+lampColor: 0xfff2cc,
+lampIntensity: 55
+}
+];
+
+/* ==========================================================================
+8. WORLD CLEARING
+========================================================================== */
+
+function clearWorld() {
+while (world.children.length > 0) {
+world.remove(world.children[0]);
+}
+for (const m of levelMats) {
+if (m.map) { /* textures disposed separately */ }
+m.dispose();
+}
+for (const t of textureRegistry) t.dispose();
+levelMats.length = 0;
+textureRegistry.length = 0;
+matCache.clear();
+
+for (const l of levelLights) {
+scene.remove(l);
+if (l.shadow && l.shadow.map) l.shadow.map.dispose();
+}
+levelLights.length = 0;
+if (sunLight) { sunLight = null; }
+
+colliders.length = 0;
+lamps.length = 0;
+enemies.length = 0;
+pickups.length = 0;
+boss = null;
+bossActive = false;
+}
+
+/* ==========================================================================
+9. WORLD BUILDERS
+========================================================================== */
+
+function addCollider(cx, cz, w, d) {
+colliders.push({
+x1: cx - w / 2, x2: cx + w / 2,
+z1: cz - d / 2, z2: cz + d / 2
+});
+}
+
+/* ------- generic helpers ------- */
+
+function addBox(w, h, d, x, y, z, material, cast = true, receive = true) {
+const m = new THREE.Mesh(GEO.box, material);
+m.scale.set(w, h, d);
+m.position.set(x, y, z);
+m.castShadow = cast;
+m.receiveShadow = receive;
+world.add(m);
+return m;
+}
+
+function addCyl(r, h, x, y, z, material, seg = 12) {
+const g = seg <= 6 ? GEO.cylLo : GEO.cyl;
+const m = new THREE.Mesh(g, material);
+m.scale.set(r, h, r);
+m.position.set(x, y, z);
+m.castShadow = true;
+m.receiveShadow = true;
+world.add(m);
+return m;
+}
+
+/* ------- ground ------- */
+
+function buildGround(L, isIndoor) {
+const noiseC = makeNoiseCanvas(256, L.groundHex, 26);
+addGrime(noiseC, 70, 0.16, 0, 0, 0);
+addCracks(noiseC, 16, 'rgba(0,0,0,0.35)');
+if (isIndoor) addTilePattern(noiseC, 32, 'rgba(0,0,0,0.42)', 2);
+
+const tex = makeTexture(noiseC, 26, Math.max(30, L.length / 6));
+const mat = stdMat({ map: tex, color: 0xffffff, roughness: 0.94, metalness: 0.04 });
+
+const g = new THREE.PlaneGeometry(220, L.length + 240);
+const ground = new THREE.Mesh(g, mat);
+ground.rotation.x = -Math.PI / 2;
+ground.position.set(0, 0, -L.length / 2);
+ground.receiveShadow = true;
+world.add(ground);
+}
+
+/* ------- street / road strip ------- */
+
+function buildRoad(L) {
+const roadCanvas = makeNoiseCanvas(256, 0x2e2f31, 22);
+addGrime(roadCanvas, 60, 0.22, 0, 0, 0);
+addCracks(roadCanvas, 22, 'rgba(0,0,0,0.45)');
+const roadTex = makeTexture(roadCanvas, 4, Math.max(20, L.length / 8));
+const roadMat = stdMat({ map: roadTex, color: 0xffffff, roughness: 0.98 });
+
+const road = new THREE.Mesh(new THREE.PlaneGeometry(13, L.length + 40), roadMat);
+road.rotation.x = -Math.PI / 2;
+road.position.set(0, 0.02, -L.length / 2);
+road.receiveShadow = true;
+world.add(road);
+
+// road markings
+const markMat = stdMat({ color: 0xd8d2a8, roughness: 0.9 });
+for (let z = 6; z > -L.length - 10; z -= 12) {
+addBox(0.24, 0.015, 5, 0, 0.035, z, markMat, false, false);
+}
+
+// sidewalks
+const swCanvas = makeNoiseCanvas(256, L.sidewalkHex, 22);
+addGrime(swCanvas, 40, 0.16, 0, 0, 0);
+addTilePattern(swCanvas, 64, 'rgba(0,0,0,0.28)', 2);
+const swTex = makeTexture(swCanvas, 3, Math.max(30, L.length / 8));
+const swMat = stdMat({ map: swTex, color: 0xffffff, roughness: 0.95 });
+
+for (const sx of [-1, 1]) {
+addBox(5.0, 0.30, L.length + 40, sx * 9.2, 0.15, -L.length / 2, swMat, false, true);
+// curb
+const curbMat = stdMat({ color: 0x9a9a92, roughness: 0.9 });
+addBox(0.35, 0.34, L.length + 40, sx * 6.6, 0.17, -L.length / 2, curbMat, false, true);
+}
+}
+
+/* ------- buildings ------- */
+
+function makeBuildingMaterial(w, h, hue, L) {
+const cols = Math.max(2, Math.round(w / 3.2));
+const rows = Math.max(3, Math.round(h / 3.4));
+const size = 256;
+const c = makeNoiseCanvas(size, hue, 20);
+addGrime(c, 26, 0.20, 0, 0, 0);
+addWindows(c, cols, rows, L.windowDark, L.windowLit, L.litChance);
+const tex = makeTexture(c, 1, 1);
+return stdMat({ map: tex, color: 0xffffff, roughness: 0.92, metalness: 0.05 });
+}
+
+function buildBuildings(L) {
+const len = L.length;
+
+for (const side of [-1, 1]) {
+let z = 10;
+while (z > -len + 6) {
+const depth = rnd(11, 22);
+const width = rnd(11, 20);
+const h = rnd(11, 34);
+const gap = rnd(1.5, 6);
+const x = side * (14.5 + width / 2 + rnd(0, 5));
+const hue = pick(L.buildingHues);
+
+const mat = makeBuildingMaterial(width, h, hue, L);
+const b = addBox(width, h, depth, x, h / 2, z - depth / 2, mat, true, true);
+
+// roof cap
+const roofMat = stdMat({ color: 0x3a3c3e, roughness: 0.95 });
+addBox(width + 0.5, 0.5, depth + 0.5, x, h + 0.25, z - depth / 2, roofMat, true, false);
+
+// random rooftop box (vents)
+if (srand() < 0.55) {
+addBox(rnd(1.6, 3.4), rnd(1.0, 2.6), rnd(1.6, 3.4),
+x + rnd(-width * 0.25, width * 0.25), h + 1.0,
+z - depth / 2 + rnd(-depth * 0.25, depth * 0.25),
+roofMat, true, false);
+}
+
+addCollider(x, z - depth / 2, width, depth);
+b.userData.disposeGeo = false;
+z -= depth + gap;
+}
+}
+}
+
+/* ------- street props ------- */
+
+function buildStreetProps(L) {
+const len = L.length;
+
+const barrelMat = stdMat({ color: 0x6b4a2a, roughness: 0.75, metalness: 0.45 });
+const crateMat = stdMat({ color: 0x7a6136, roughness: 0.9 });
+const metalMat = stdMat({ color: 0x4a4e52, roughness: 0.55, metalness: 0.7 });
+const binMat = stdMat({ color: 0x2f3a33, roughness: 0.8, metalness: 0.3 });
+
+for (let z = 2; z > -len - 5; z -= rnd(7, 15)) {
+const side = srand() < 0.5 ? -1 : 1;
+const x = side * rnd(7.2, 10.6);
+const roll = srand();
+
+if (roll < 0.28) {
+// barrel
+const b = addCyl(0.42, 1.05, x, 0.62, z, barrelMat);
+b.castShadow = true;
+addCollider(x, z, 0.9, 0.9);
+} else if (roll < 0.5) {
+// crates
+const s = rnd(0.7, 1.1);
+addBox(s, s, s, x, s / 2 + 0.3, z, crateMat, true, true);
+if (srand() < 0.5) {
+addBox(s * 0.8, s * 0.8, s * 0.8, x + 0.1, s * 1.5 + 0.3, z, crateMat, true, true);
+}
+addCollider(x, z, s + 0.3, s + 0.3);
+} else if (roll < 0.68) {
+// trash bin
+addCyl(0.35, 0.95, x, 0.62, z, binMat, 8);
+addCollider(x, z, 0.8, 0.8);
+} else if (roll < 0.84) {
+// pipe cluster
+for (let i = 0; i < 3; i++) {
+const p = addCyl(0.14, rnd(1.6, 3.2), x + i * 0.32, 0.9, z, metalMat, 8);
+p.rotation.z = Math.PI / 2;
+p.rotation.y = rnd(0, TAU);
+}
+addCollider(x, z, 1.2, 1.2);
+}
+}
+}
+
+/* ------- trees ------- */
+
+function buildTrees(L) {
+const trunkMat = stdMat({ color: 0x4a3a28, roughness: 0.95 });
+const leafMatA = stdMat({ color: 0x2f4a2a, roughness: 0.95 });
+const leafMatB = stdMat({ color: 0x3a5a30, roughness: 0.95 });
+
+for (let z = 0; z > -L.length; z -= rnd(11, 24)) {
+if (srand() < 0.35) continue;
+const side = srand() < 0.5 ? -1 : 1;
+const x = side * rnd(7.4, 10.8);
+const th = rnd(2.4, 4.2);
+const tr = addCyl(0.16, th, x, th / 2 + 0.3, z, trunkMat, 8);
+tr.castShadow = true;
+
+const blobs = rndInt(2, 3);
+for (let i = 0; i < blobs; i++) {
+const leaf = new THREE.Mesh(GEO.sphereLo, srand() < 0.5 ? leafMatA : leafMatB);
+const r = rnd(0.9, 1.7);
+leaf.scale.set(r, r * 0.85, r);
+leaf.position.set(
+x + rnd(-0.55, 0.55),
+th + 0.35 + rnd(-0.25, 0.7),
+z + rnd(-0.55, 0.55)
+);
+leaf.castShadow = true;
+world.add(leaf);
+}
+addCollider(x, z, 0.7, 0.7);
+}
+}
+
+/* ------- lamps ------- */
+
+function buildLamps(L, count) {
+const poleMat = stdMat({ color: 0x24282c, roughness: 0.6, metalness: 0.75 });
+const bulbMat = stdMat({
+color: L.lampColor,
+emissive: new THREE.Color(L.lampColor),
+emissiveIntensity: 3.2,
+roughness: 0.3
+});
+
+const step = L.length / count;
+
+for (let i = 0; i < count; i++) {
+const z = -i * step - 8;
+const side = i % 2 === 0 ? -1 : 1;
+const x = side * 8.6;
+
+addCyl(0.11, 5.2, x, 2.6, z, poleMat, 8);
+// arm
+const arm = addBox(1.5, 0.14, 0.14, x + side * -0.7, 5.15, z, poleMat, true, false);
+arm.rotation.z = 0;
+
+const bulb = new THREE.Mesh(GEO.sphereLo, bulbMat);
+bulb.scale.setScalar(0.30);
+bulb.position.set(x + side * -1.35, 5.0, z);
+world.add(bulb);
+
+lamps.push({ mesh: bulb, base: 3.2, phase: srand() * TAU });
+
+// real light for every 3rd lamp (perf)
+if (i % 3 === 0) {
+const pl = new THREE.PointLight(L.lampColor, L.lampIntensity, 26, 2);
+pl.position.set(x + side * -1.35, 5.0, z);
+scene.add(pl);
+levelLights.push(pl);
+lamps[lamps.length - 1].light = pl;
+lamps[lamps.length - 1].lightBase = L.lampIntensity;
+}
+
+addCollider(x, z, 0.6, 0.6);
+}
+}
+
+/* ------- industrial pipes / towers (level 2 flavour) ------- */
+
+function buildIndustrial(L) {
+const metalMat = stdMat({ color: 0x6a5a4a, roughness: 0.6, metalness: 0.65 });
+const rustMat = stdMat({ color: 0x8a4a28, roughness: 0.85, metalness: 0.35 });
+
+for (let z = -14; z > -L.length; z -= rnd(28, 52)) {
+const side = srand() < 0.5 ? -1 : 1;
+const x = side * rnd(16, 24);
+const h = rnd(12, 26);
+addCyl(rnd(1.4, 2.6), h, x, h / 2, z, metalMat, 12);
+// top ring
+addCyl(rnd(1.5, 2.7), 0.6, x, h + 0.3, z, rustMat, 12);
+addCollider(x, z, 4, 4);
+
+// horizontal pipe bridge across street
+if (srand() < 0.4) {
+const pipe = addCyl(0.35, 26, 0, rnd(7, 11), z, metalMat, 8);
+pipe.rotation.z = Math.PI / 2;
+pipe.rotation.y = 0;
+}
+}
+}
+
+/* ------- sewer flavour ------- */
+
+function buildSewerDetail(L) {
+const pipeMat = stdMat({ color: 0x2e3a33, roughness: 0.7, metalness: 0.55 });
+const slimeMat = stdMat({
+color: 0x2a5a3a, roughness: 0.35, metalness: 0.1,
+emissive: new THREE.Color(0x0a2a18), emissiveIntensity: 1.0
+});
+
+for (let z = -6; z > -L.length; z -= rnd(9, 18)) {
+const side = srand() < 0.5 ? -1 : 1;
+const x = side * rnd(8.5, 11.5);
+// big wall pipes
+const p = addCyl(0.4, rnd(2.5, 5), x, rnd(2.5, 4.2), z, pipeMat, 8);
+p.rotation.z = Math.PI / 2;
+p.rotation.y = Math.PI / 2;
+
+// slime puddle
+const puddle = new THREE.Mesh(GEO.cylLo, slimeMat);
+puddle.scale.set(rnd(0.9, 2.0), 0.05, rnd(0.9, 2.0));
+puddle.position.set(rnd(-6, 6), 0.05, z);
+world.add(puddle);
+}
+}
+
+/* ------- metro tunnel (final area of levels 1-3) ------- */
+
+function buildMetroTunnel(L, startZ, endZ) {
+const len = Math.abs(startZ - endZ);
+const midZ = (startZ + endZ) / 2;
+
+const tileC = makeNoiseCanvas(256, 0x4a5058, 20);
+addTilePattern(tileC, 32, 'rgba(0,0,0,0.5)', 2);
+addGrime(tileC, 40, 0.24, 0, 0, 0);
+const tileTex = makeTexture(tileC, 8, Math.max(10, len / 6));
+const wallMat = stdMat({ map: tileTex, color: 0xffffff, roughness: 0.6, metalness: 0.2 });
+
+const floorC = makeNoiseCanvas(256, 0x2a2e33, 16);
+addTilePattern(floorC, 64, 'rgba(0,0,0,0.55)', 3);
+const floorTex = makeTexture(floorC, 6, Math.max(10, len / 6));
+const floorMat = stdMat({ map: floorTex, color: 0xffffff, roughness: 0.7, metalness: 0.15 });
+
+// floor
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(16, len), floorMat);
+floor.rotation.x = -Math.PI / 2;
+floor.position.set(0, 0.03, midZ);
+floor.receiveShadow = true;
+world.add(floor);
+
+// walls
+for (const sx of [-1, 1]) {
+addBox(0.6, 5.2, len, sx * 8, 2.6, midZ, wallMat, true, true);
+addCollider(sx * 8, midZ, 0.8, len);
+}
+
+// ceiling
+const ceilMat = stdMat({ color: 0x1e2226, roughness: 0.95 });
+addBox(17, 0.5, len, 0, 5.3, midZ, ceilMat, false, true);
+
+// rib arches + fluorescent lights
+const ribMat = stdMat({ color: 0x33383d, roughness: 0.8, metalness: 0.4 });
+const lightMat = stdMat({
+color: 0xfff6d8, emissive: new THREE.Color(0xfff2cc), emissiveIntensity: 4.0, roughness: 0.4
+});
+
+let idx = 0;
+for (let z = startZ; z > endZ; z -= 7) {
+for (const sx of [-1, 1]) {
+addBox(0.5, 5.2, 0.5, sx * 7.6, 2.6, z, ribMat, true, false);
+}
+addBox(16.2, 0.5, 0.5, 0, 5.1, z, ribMat, true, false);
+
+if (idx % 2 === 0) {
+addBox(1.6, 0.14, 2.4, 0, 5.0, z - 3.2, lightMat, false, false);
+if (idx % 6 === 0) {
+const pl = new THREE.PointLight(0xfff2cc, 55, 24, 2);
+pl.position.set(0, 4.6, z - 3.2);
+scene.add(pl);
+levelLights.push(pl);
+lamps.push({ mesh: null, light: pl, lightBase: 55, phase: srand() * TAU, base: 0 });
+}
+}
+idx++;
+}
+
+// МЕТРО sign
+const signMat = stdMat({
+color: 0xff2b2b, emissive: new THREE.Color(0xff1a1a), emissiveIntensity: 2.2, roughness: 0.5
+});
+addBox(7.0, 1.4, 0.18, 0, 4.2, endZ + 1.5, signMat, false, false);
+
+// columns
+const colMat = stdMat({ color: 0x3a4048, roughness: 0.7, metalness: 0.3 });
+for (let z = startZ - 10; z > endZ + 6; z -= 14) {
+for (const sx of [-1, 1]) {
+addCyl(0.45, 5.0, sx * 5.2, 2.5, z, colMat, 10);
+addCollider(sx * 5.2, z, 1.2, 1.2);
+}
+}
+}
+
+/* ------- full metro station (level 4) ------- */
+
+function buildMetroStation(L) {
+const len = L.length;
+
+// floor tiles
+const tileC = makeNoiseCanvas(512, 0x4a5058, 18);
+addTilePattern(tileC, 32, 'rgba(0,0,0,0.42)', 2);
+addGrime(tileC, 80, 0.26, 0, 0, 0);
+const tileTex = makeTexture(tileC, 10, Math.max(14, len / 5));
+const floorMat = stdMat({ map: tileTex, color: 0xffffff, roughness: 0.55, metalness: 0.2 });
+
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(26, len), floorMat);
+floor.rotation.x = -Math.PI / 2;
+floor.position.set(0, 0.03, -len / 2);
+floor.receiveShadow = true;
+world.add(floor);
+
+// walls
+const wallC = makeNoiseCanvas(256, 0x5a4038, 18);
+addTilePattern(wallC, 64, 'rgba(0,0,0,0.35)', 2);
+addGrime(wallC, 50, 0.28, 0, 0, 0);
+const wallTex = makeTexture(wallC, Math.max(10, len / 6), 4);
+const wallMat = stdMat({ map: wallTex, color: 0xffffff, roughness: 0.7, metalness: 0.15 });
+
+for (const sx of [-1, 1]) {
+addBox(0.7, 7.5, len, sx * 13, 3.75, -len / 2, wallMat, true, true);
+addCollider(sx * 13, -len / 2, 1.0, len);
+}
+
+// ceiling
+const ceilMat = stdMat({ color: 0x14181c, roughness: 0.95 });
+addBox(27, 0.6, len, 0, 7.7, -len / 2, ceilMat, false, true);
+
+// columns (two rows)
+const colMat = stdMat({ color: 0x6a6a62, roughness: 0.6, metalness: 0.25 });
+const colTopMat = stdMat({ color: 0x8a8a80, roughness: 0.5, metalness: 0.4 });
+
+for (let z = -8; z > -len + 12; z -= 11) {
+for (const sx of [-1, 1]) {
+const x = sx * 7.4;
+addCyl(0.62, 7.2, x, 3.6, z, colMat, 14);
+addCyl(0.9, 0.4, x, 7.25, z, colTopMat, 14);
+addCyl(0.9, 0.4, x, 0.2, z, colTopMat, 14);
+addCollider(x, z, 1.5, 1.5);
+}
+}
+
+// benches
+const benchMat = stdMat({ color: 0x3a2a1e, roughness: 0.9 });
+const benchLegMat = stdMat({ color: 0x2a2e32, roughness: 0.6, metalness: 0.7 });
+for (let z = -20; z > -len + 20; z -= 26) {
+for (const sx of [-1, 1]) {
+const x = sx * 10.2;
+addBox(1.0, 0.14, 3.2, x, 0.62, z, benchMat, true, true);
+addBox(1.0, 0.75, 0.14, x + sx * 0.45, 1.0, z, benchMat, true, true);
+addBox(0.14, 0.6, 0.14, x, 0.3, z - 1.3, benchLegMat, true, false);
+addBox(0.14, 0.6, 0.14, x, 0.3, z + 1.3, benchLegMat, true, false);
+addCollider(x, z, 1.4, 3.4);
+}
+}
+
+// hanging fluorescent fixtures + point lights
+const fixMat = stdMat({ color: 0x2a2e32, roughness: 0.8, metalness: 0.5 });
+const glowMat = stdMat({
+color: 0xfff6d8, emissive: new THREE.Color(0xfff2cc), emissiveIntensity: 4.5, roughness: 0.4
+});
+
+let i = 0;
+for (let z = -10; z > -len + 6; z -= 13) {
+addCyl(0.06, 1.2, 0, 7.1, z, fixMat, 6);
+addBox(2.2, 0.22, 0.9, 0, 6.5, z, glowMat, false, false);
+
+if (i % 2 === 0) {
+const pl = new THREE.PointLight(0xfff2cc, 60, 30, 2);
+pl.position.set(0, 6.2, z);
+scene.add(pl);
+levelLights.push(pl);
+lamps.push({ mesh: null, light: pl, lightBase: 60, phase: srand() * TAU, base: 0 });
+}
+i++;
+}
+
+// station sign
+const signMat = stdMat({
+color: 0xd81e1e, emissive: new THREE.Color(0xd81e1e), emissiveIntensity: 1.6, roughness: 0.5
+});
+addBox(11, 1.8, 0.2, 0, 5.6, -14, signMat, false, false);
+
+// track pit at the very end
+const pitMat = stdMat({ color: 0x08090a, roughness: 1.0 });
+addBox(26, 0.4, 26, 0, -0.2, -len + 6, pitMat, false, false);
+const railMat = stdMat({ color: 0x6a6a6a, roughness: 0.35, metalness: 0.9 });
+for (const sx of [-1, 1]) {
+addBox(0.2, 0.18, 22, sx * 2.4, 0.05, -len + 6, railMat, false, false);
+}
+// end wall
+addBox(27, 9, 0.7, 0, 4.5, -len + 0.5, wallMat, true, true);
+}
+
+/* ------- sky dome (outdoor) ------- */
+
+function buildSkyDome(L) {
+const geo = new THREE.SphereGeometry(400, 24, 16);
+const mat = new THREE.MeshBasicMaterial({
+color: L.skyColor,
+side: THREE.BackSide,
+fog: false
+});
+levelMats.push(mat);
+const dome = new THREE.Mesh(geo, mat);
+dome.position.y = 0;
+world.add(dome);
+// Dispose geometry on clear is handled by GC; small.
+}
+
+/* ==========================================================================
+10. LEVEL BUILDER
+========================================================================== */
+
+function buildLevel(index) {
+clearWorld();
+const L = LEVELS[index];
+levelLength = L.length;
+levelIndex = index;
+
+scene.background = new THREE.Color(L.skyColor);
+scene.fog = new THREE.Fog(L.fogColor, L.fogNear, L.fogFar);
+
+/* ---- LIGHTS ---- */
+const hemi = new THREE.HemisphereLight(L.hemiSky, L.hemiGround, L.hemiInt);
+scene.add(hemi);
+levelLights.push(hemi);
+
+const amb = new THREE.AmbientLight(L.ambColor, L.ambInt);
+scene.add(amb);
+levelLights.push(amb);
+
+if (L.sun && L.sunInt > 0) {
+const dir = new THREE.DirectionalLight(L.sunColor, L.sunInt);
+dir.position.set(-45, 70, 25);
+dir.castShadow = true;
+dir.shadow.mapSize.set(2048, 2048);
+dir.shadow.camera.left = -70;
+dir.shadow.camera.right = 70;
+dir.shadow.camera.top = 70;
+dir.shadow.camera.bottom = -70;
+dir.shadow.camera.near = 1;
+dir.shadow.camera.far = 220;
+dir.shadow.bias = -0.0009;
+dir.shadow.normalBias = 0.035;
+scene.add(dir);
+scene.add(dir.target);
+levelLights.push(dir);
+sunLight = dir;
+}
+
+/* ---- GEOMETRY ---- */
+const isMetro = (index === 3);
+
+if (isMetro) {
+buildMetroStation(L);
+buildLamps(L, 6);
+} else {
+buildSkyDome(L);
+buildGround(L, index === 2);
+buildRoad(L);
+buildBuildings(L);
+buildTrees(L);
+buildStreetProps(L);
+if (index === 1) buildIndustrial(L);
+if (index === 2) buildSewerDetail(L);
+buildLamps(L, 10);
+
+// metro tunnel final area (last 22% of the level)
+const tunnelStart = -L.length * 0.78;
+const tunnelEnd = -L.length - 24;
+buildMetroTunnel(L, tunnelStart, tunnelEnd);
+}
+
+/* ---- ENEMIES ---- */
+spawnEnemies(L);
+
+/* ---- PICKUPS ---- */
+spawnPickups(L);
+
+/* ---- PLAYER RESET POSITION ---- */
+player.pos.set(0, 0, 4);
+player.vel.set(0, 0, 0);
+player.yaw = 0;
+player.pitch = 0;
+player.peeCharge = 0;
+player.peeGoal = L.peeGoal;
+player.peeing = false;
+player.invuln = 0;
+player.dodgeTimer = 0;
+player.dodgeCd = 0;
+
+bossActive = false;
+boss = null;
+jumpscareTimer = 0;
+
+updateHUDStatic(L);
+updateBossBar();
+
+document.getElementById('bossWrap').style.display = 'none';
+document.getElementById('peeFill').style.width = '0%';
+}
+
+function updateHUDStatic(L) {
+document.getElementById('levelName').textContent = L.name;
+document.getElementById('levelSub').textContent = L.sub;
+document.getElementById('objective').textContent = L.objective;
+}
+
+/* ==========================================================================
+11. ENEMY SYSTEM
+========================================================================== */
+
+function makeEyeMaterial() {
+return matCached('eyeRed', () => new THREE.MeshStandardMaterial({
+color: 0xff3030,
+emissive: new THREE.Color(0xff1010),
+emissiveIntensity: 4.0,
+roughness: 0.3
+}));
+}
+
+function makeEnemyMesh(type) {
+const g = new THREE.Group();
+
+const eyeMat = makeEyeMaterial();
+
+if (type === 'pillbug') {
+const shellMat = matCached('pillShell', () => new THREE.MeshStandardMaterial({
+color: 0x5a6068, roughness: 0.32, metalness: 0.6
+}));
+const darkMat = matCached('pillDark', () => new THREE.MeshStandardMaterial({
+color: 0x24282d, roughness: 0.7, metalness: 0.35
+}));
+
+const n = 6;
+for (let i = 0; i < n; i++) {
+const t = i / (n - 1);
+const r = 0.62 * Math.sin(Math.PI * (0.22 + t * 0.68));
+const seg = new THREE.Mesh(GEO.sphere, shellMat);
+seg.scale.set(r * 1.28, r * 0.78, r * 0.92);
+seg.position.set(0, 0.44, (t - 0.5) * 1.9);
+g.add(seg);
+}
+
+const head = new THREE.Mesh(GEO.sphere, darkMat);
+head.scale.set(0.52, 0.36, 0.46);
+head.position.set(0, 0.38, 1.12);
+g.add(head);
+
+for (const sx of [-1, 1]) {
+const eye = new THREE.Mesh(GEO.sphereLo, eyeMat);
+eye.scale.setScalar(0.085);
+eye.position.set(sx * 0.18, 0.50, 1.30);
+g.add(eye);
+
+const ant = new THREE.Mesh(GEO.cylLo, darkMat);
+ant.scale.set(0.028, 0.62, 0.028);
+ant.position.set(sx * 0.22, 0.62, 1.36);
+ant.rotation.x = -0.7;
+ant.rotation.z = sx * 0.35;
+g.add(ant);
+}
+
+for (let i = 0; i < 4; i++) {
+for (const sx of [-1, 1]) {
+const leg = new THREE.Mesh(GEO.cylLo, darkMat);
+leg.scale.set(0.035, 0.36, 0.035);
+leg.position.set(sx * 0.52, 0.22, (i - 1.5) * 0.42);
+leg.rotation.z = sx * 0.62;
+g.add(leg);
+}
+}
+}
+
+else if (type === 'centipede') {
+const bodyMat = matCached('centiBody', () => new THREE.MeshStandardMaterial({
+color: 0x7a2020, roughness: 0.45, metalness: 0.4
+}));
+const legMat = matCached('centiLeg', () => new THREE.MeshStandardMaterial({
+color: 0x2a0a0a, roughness: 0.8
+}));
+
+const n = 9;
+for (let i = 0; i < n; i++) {
+const t = i / (n - 1);
+const r = 0.30 * (1 - Math.abs(t - 0.45) * 0.9);
+const seg = new THREE.Mesh(GEO.sphere, bodyMat);
+seg.scale.set(r * 1.1, r * 0.8, r);
+seg.position.set(0, 0.42, (t - 0.5) * 2.6);
+g.add(seg);
+
+if (i % 2 === 0) {
+for (const sx of [-1, 1]) {
+const leg = new THREE.Mesh(GEO.cylLo, legMat);
+leg.scale.set(0.028, 0.42, 0.028);
+leg.position.set(sx * 0.28, 0.22, (t - 0.5) * 2.6);
+leg.rotation.z = sx * 0.95;
+g.add(leg);
+}
+}
+}
+
+for (const sx of [-1, 1]) {
+const eye = new THREE.Mesh(GEO.sphereLo, eyeMat);
+eye.scale.setScalar(0.07);
+eye.position.set(sx * 0.13, 0.52, 1.38);
+g.add(eye);
+}
+}
+
+else { // tapeworm
+const bodyMat = matCached('wormBody', () => new THREE.MeshStandardMaterial({
+color: 0xd8a8a0, roughness: 0.35, metalness: 0.1,
+emissive: new THREE.Color(0x3a1010), emissiveIntensity: 0.7
+}));
+const ringMat = matCached('wormRing', () => new THREE.MeshStandardMaterial({
+color: 0xa07068, roughness: 0.6
+}));
+
+const n = 10;
+for (let i = 0; i < n; i++) {
+const t = i / (n - 1);
+const r = 0.24 * (1 - t * 0.45);
+const seg = new THREE.Mesh(GEO.sphere, bodyMat);
+seg.scale.set(r, r, r * 1.35);
+seg.position.set(0, 0.55 + Math.sin(t * 6) * 0.12, (t - 0.5) * 2.9);
+g.add(seg);
+
+if (i > 0) {
+const ring = new THREE.Mesh(GEO.torus, ringMat);
+ring.scale.setScalar(r * 1.05);
+ring.rotation.x = Math.PI / 2;
+ring.position.copy(seg.position);
+g.add(ring);
+}
+}
+
+// mouth
+const mouth = new THREE.Mesh(GEO.sphereLo, matCached('wormMouth', () =>
+new THREE.MeshStandardMaterial({ color: 0x1a0505, emissive: new THREE.Color(0x3a0000), emissiveIntensity: 1.4 })));
+mouth.scale.set(0.20, 0.20, 0.10);
+mouth.position.set(0, 0.55, 1.55);
+g.add(mouth);
+
+for (const sx of [-1, 1]) {
+const eye = new THREE.Mesh(GEO.sphereLo, eyeMat);
+eye.scale.setScalar(0.06);
+eye.position.set(sx * 0.14, 0.64, 1.52);
+g.add(eye);
+}
+}
+
+return g;
+}
+
+const ENEMY_STATS = {
+pillbug: { speed: 2.7, hp: 4, radius: 1.25, damage: 1 },
+centipede: { speed: 4.3, hp: 3, radius: 1.15, damage: 1 },
+tapeworm: { speed: 3.2, hp: 5, radius: 1.30, damage: 1 }
+};
+
+function spawnEnemies(L) {
+const startZ = -18;
+const endZ = -L.length - 12;
+
+for (let i = 0; i < L.enemyCount; i++) {
+const type = pick(L.enemyTypes);
+const stats = ENEMY_STATS[type];
+const z = rnd(endZ, startZ);
+const x = rnd(-6.5, 6.5);
+
+const group = makeEnemyMesh(type);
+group.position.set(x, 0, z);
+world.add(group);
+
+// fake contact shadow
+const shadowMat = matCached('enemyShadow', () => new THREE.MeshBasicMaterial({
+color: 0x000000, transparent: true, opacity: 0.34, depthWrite: false
+}));
+const sh = new THREE.Mesh(GEO.plane, shadowMat);
+sh.rotation.x = -Math.PI / 2;
+sh.scale.setScalar(stats.radius * 2.0);
+sh.position.y = 0.04;
+group.add(sh);
+
+enemies.push({
+type,
+group,
+speed: stats.speed * rnd(0.9, 1.15),
+hp: stats.hp,
+maxHp: stats.hp,
+radius: stats.radius,
+damage: stats.damage,
+attackCd: 0,
+phase: srand() * TAU,
+wanderAngle: srand() * TAU,
+alive: true,
+baseY: 0
+});
+}
+}
+
+function updateEnemies(dt) {
+const px = player.pos.x;
+const pz = player.pos.z;
+
+for (let i = enemies.length - 1; i >= 0; i--) {
+const e = enemies[i];
+if (!e.alive) {
+enemies.splice(i, 1);
+continue;
+}
+
+const g = e.group;
+const dx = px - g.position.x;
+const dz = pz - g.position.z;
+const d = Math.hypot(dx, dz);
+
+e.phase += dt * (3 + e.speed);
+
+if (d < 55 && d > 0.001) {
+const nx = dx / d;
+const nz = dz / d;
+g.position.x += nx * e.speed * dt;
+g.position.z += nz * e.speed * dt;
+
+const targetRot = Math.atan2(nx, nz);
+let diff = targetRot - g.rotation.y;
+while (diff > Math.PI) diff -= TAU;
+while (diff < -Math.PI) diff += TAU;
+g.rotation.y += diff * Math.min(1, dt * 9);
+} else {
+e.wanderAngle += (srand() - 0.5) * dt * 2.5;
+g.position.x += Math.sin(e.wanderAngle) * e.speed * 0.35 * dt;
+g.position.z += Math.cos(e.wanderAngle) * e.speed * 0.35 * dt;
+g.rotation.y = e.wanderAngle;
+}
+
+// clamp to walkable corridor
+g.position.x = clamp(g.position.x, -11.5, 11.5);
+g.position.z = clamp(g.position.z, -levelLength - 26, 8);
+
+// crawl bobbing
+g.position.y = Math.abs(Math.sin(e.phase)) * 0.055;
+g.rotation.z = Math.sin(e.phase * 0.8) * 0.07;
+
+// contact damage
+if (e.attackCd > 0) e.attackCd -= dt;
+if (d < e.radius + 0.35 && e.attackCd <= 0) {
+e.attackCd = 1.0;
+damagePlayer(e.damage);
+}
+}
+}
+
+/* ==========================================================================
+12. PICKUPS (healing)
+========================================================================== */
+
+function spawnPickups(L) {
+const crossMat = matCached('healCross', () => new THREE.MeshStandardMaterial({
+color: 0x7dffb0,
+emissive: new THREE.Color(0x33ff88),
+emissiveIntensity: 3.5,
+roughness: 0.25
+}));
+
+for (let i = 0; i < L.heals; i++) {
+const z = rnd(-L.length * 0.9, -20);
+const x = rnd(-9, 9);
+
+const g = new THREE.Group();
+const a = new THREE.Mesh(GEO.box, crossMat);
+a.scale.set(0.55, 0.18, 0.18);
+g.add(a);
+const b = new THREE.Mesh(GEO.box, crossMat);
+b.scale.set(0.18, 0.55, 0.18);
+g.add(b);
+
+const halo = new THREE.Mesh(GEO.sphereLo, matCached('haloMat', () =>
+new THREE.MeshBasicMaterial({ color: 0x33ff88, transparent: true, opacity: 0.18, depthWrite: false })));
+halo.scale.setScalar(0.9);
+g.add(halo);
+
+g.position.set(x, 1.1, z);
+world.add(g);
+
+pickups.push({ group: g, phase: srand() * TAU, alive: true });
+}
+}
+
+function updatePickups(dt) {
+for (let i = pickups.length - 1; i >= 0; i--) {
+const p = pickups[i];
+p.phase += dt * 2.4;
+p.group.rotation.y += dt * 1.8;
+p.group.position.y = 1.05 + Math.sin(p.phase) * 0.22;
+
+if (dist2D(p.group.position.x, p.group.position.z, player.pos.x, player.pos.z) < 1.5) {
+world.remove(p.group);
+pickups.splice(i, 1);
+player.hp = CFG.maxHP;
+sfxPickup();
+flashHeal();
+}
+}
+}
+
+let healFlashTimer = 0;
+function flashHeal() {
+healFlashTimer = 0.4;
+const el = document.getElementById('hurtFlash');
+el.style.background =
+'radial-gradient(ellipse at center, rgba(0,255,120,0) 40%, rgba(0,255,120,.55) 100%)';
+el.style.opacity = '1';
+setTimeout(() => {
+el.style.opacity = '0';
+setTimeout(() => {
+el.style.background =
+'radial-gradient(ellipse at center, rgba(255,0,0,0) 35%, rgba(180,0,0,.85) 100%)';
+}, 200);
+}, 260);
+}
+
+/* ==========================================================================
+13. PEE PARTICLE SYSTEM
+========================================================================== */
+
+const PEE_MAX = 260;
+const peePositions = new Float32Array(PEE_MAX * 3);
+const peeVelocities = new Float32Array(PEE_MAX * 3);
+const peeLifes = new Float32Array(PEE_MAX);
+let peeCursor = 0;
+
+const peeGeo = new THREE.BufferGeometry();
+peeGeo.setAttribute('position', new THREE.BufferAttribute(peePositions, 3));
+
+const peeMat = new THREE.PointsMaterial({
+color: 0xffe066,
+size: 0.13,
+transparent: true,
+opacity: 0.92,
+depthWrite: false,
+blending: THREE.NormalBlending,
+sizeAttenuation: true
+});
+
+const peePoints = new THREE.Points(peeGeo, peeMat);
+peePoints.frustumCulled = false;
+scene.add(peePoints);
+
+for (let i = 0; i < PEE_MAX; i++) {
+peePositions[i * 3 + 1] = -9999;
+}
+
+function spawnPeeParticles(dt) {
+const forward = new THREE.Vector3(0, 0, -1).applyEuler(
+new THREE.Euler(player.pitch, player.yaw, 0, 'YXZ')
+);
+
+const originX = player.pos.x + forward.x * 0.55;
+const originY = CFG.playerHeight - 0.42 + Math.sin(player.bobPhase * 2) * 0.02;
+const originZ = player.pos.z + forward.z * 0.55;
+
+const count = Math.ceil(dt * 170) + 1;
+
+for (let i = 0; i < count; i++) {
+const idx = peeCursor;
+peeCursor = (peeCursor + 1) % PEE_MAX;
+
+peePositions[idx * 3] = originX + (Math.random() - 0.5) * 0.10;
+peePositions[idx * 3 + 1] = originY + (Math.random() - 0.5) * 0.08;
+peePositions[idx * 3 + 2] = originZ + (Math.random() - 0.5) * 0.10;
+
+const spread = 0.9;
+peeVelocities[idx * 3] = forward.x * 15 + (Math.random() - 0.5) * spread;
+peeVelocities[idx * 3 + 1] = forward.y * 15 - 1.2 + (Math.random() - 0.5) * spread;
+peeVelocities[idx * 3 + 2] = forward.z * 15 + (Math.random() - 0.5) * spread;
+
+peeLifes[idx] = 0.62 + Math.random() * 0.28;
+}
+}
+
+function updatePeeParticles(dt) {
+let any = false;
+for (let i = 0; i < PEE_MAX; i++) {
+if (peeLifes[i] <= 0) continue;
+any = true;
+
+peeLifes[i] -= dt;
+if (peeLifes[i] <= 0) {
+peePositions[i * 3 + 1] = -9999;
+continue;
+}
+
+peeVelocities[i * 3 + 1] -= 19 * dt;
+
+peePositions[i * 3] += peeVelocities[i * 3] * dt;
+peePositions[i * 3 + 1] += peeVelocities[i * 3 + 1] * dt;
+peePositions[i * 3 + 2] += peeVelocities[i * 3 + 2] * dt;
+
+if (peePositions[i * 3 + 1] < 0.03) {
+peePositions[i * 3 + 1] = 0.03;
+peeVelocities[i * 3 + 1] = 0;
+peeVelocities[i * 3] *= 0.7;
+peeVelocities[i * 3 + 2] *= 0.7;
+peeLifes[i] = Math.min(peeLifes[i], 0.22);
+}
+}
+if (any || peePoints.visible) {
+peeGeo.attributes.position.needsUpdate = true;
+}
+}
+
+/* ==========================================================================
+14. PEE LOGIC (meter + damage)
+========================================================================== */
+
+function updatePee(dt) {
+const peeing = player.peeing && pointerLocked && running && !paused && player.hp > 0;
+
+document.getElementById('crosshair').classList.toggle('peeing', peeing);
+document.getElementById('peeTint').style.opacity = peeing ? '1' : '0';
+setPeeAudio(peeing);
+
+if (peeing) {
+spawnPeeParticles(dt);
+
+// ---- damage enemies in the stream ----
+const forward = new THREE.Vector3(0, 0, -1).applyEuler(
+new THREE.Euler(player.pitch, player.yaw, 0, 'YXZ')
+);
+
+for (let i = enemies.length - 1; i >= 0; i--) {
+const e = enemies[i];
+const dx = e.group.position.x - player.pos.x;
+const dz = e.group.position.z - player.pos.z;
+const d = Math.hypot(dx, dz);
+if (d > 9.5 || d < 0.001) continue;
+
+const dot = (dx / d) * forward.x + (dz / d) * forward.z;
+if (dot < 0.80) continue;
+
+e.hp -= CFG.enemyPeeDPS * dt;
+
+if (e.hp <= 0) {
+e.alive = false;
+world.remove(e.group);
+sfxKill();
+}
+}
+
+// ---- damage the boss ----
+if (bossActive && boss && boss.alive) {
+const dx = boss.group.position.x - player.pos.x;
+const dz = boss.group.position.z - player.pos.z;
+const d = Math.hypot(dx, dz);
+if (d < 30 && d > 0.001) {
+const dot = (dx / d) * forward.x + (dz / d) * forward.z;
+if (dot > 0.72) {
+boss.hp -= CFG.peeDPS * dt;
+boss.hurtFlash = 0.12;
+if (boss.hp <= 0) {
+boss.hp = 0;
+killBoss();
+}
+}
+}
+}
+
+// ---- fill the meter (not on boss level) ----
+if (!bossActive) {
+player.peeCharge += dt;
+if (player.peeCharge >= player.peeGoal) {
+player.peeCharge = player.peeGoal;
+nextLevel();
+}
+}
+}
+
+updatePeeParticles(dt);
+}
+
+/* ==========================================================================
+15. BOSS
+========================================================================== */
+
+function createBoss() {
+const g = new THREE.Group();
+
+const bodyMat = matCached('bossBody', () => new THREE.MeshStandardMaterial({
+color: 0x6a2028, roughness: 0.45, metalness: 0.35,
+emissive: new THREE.Color(0x2a0008), emissiveIntensity: 1.1
+}));
+const plateMat = matCached('bossPlate', () => new THREE.MeshStandardMaterial({
+color: 0x3a1014, roughness: 0.65, metalness: 0.5
+}));
+const eyeMat = matCached('bossEye', () => new THREE.MeshStandardMaterial({
+color: 0xff2020, emissive: new THREE.Color(0xff0000), emissiveIntensity: 6.0, roughness: 0.2
+}));
+const teethMat = matCached('bossTeeth', () => new THREE.MeshStandardMaterial({
+color: 0xe8e0c8, roughness: 0.4
+}));
+
+// main bloated body
+const body = new THREE.Mesh(GEO.sphere, bodyMat);
+body.scale.set(4.6, 3.6, 6.2);
+body.position.y = 3.4;
+g.add(body);
+
+// segment plates
+for (let i = 0; i < 7; i++) {
+const t = i / 6;
+const plate = new THREE.Mesh(GEO.sphere, plateMat);
+const r = 1.05 * Math.sin(Math.PI * (0.2 + t * 0.7));
+plate.scale.set(4.9 * (0.75 + r * 0.3), 3.9 * (0.7 + r * 0.3), 0.9);
+plate.position.set(0, 3.5 + Math.sin(t * 3) * 0.2, (t - 0.5) * 9.5);
+g.add(plate);
+}
+
+// head
+const head = new THREE.Mesh(GEO.sphere, bodyMat);
+head.scale.set(3.0, 2.6, 3.0);
+head.position.set(0, 3.2, 6.6);
+g.add(head);
+
+// eyes
+for (const sx of [-1, 1]) {
+for (let i = 0; i < 3; i++) {
+const eye = new THREE.Mesh(GEO.sphereLo, eyeMat);
+eye.scale.setScalar(0.42 - i * 0.09);
+eye.position.set(sx * (1.0 + i * 0.42), 4.1 - i * 0.28, 8.4);
+g.add(eye);
+}
+}
+
+// gaping mouth
+const mouth = new THREE.Mesh(GEO.sphereLo, matCached('bossMouth', () =>
+new THREE.MeshStandardMaterial({
+color: 0x100000, emissive: new THREE.Color(0x330000), emissiveIntensity: 1.8
+})));
+mouth.scale.set(1.5, 1.3, 0.7);
+mouth.position.set(0, 1.9, 8.6);
+g.add(mouth);
+
+// teeth
+for (let i = 0; i < 9; i++) {
+const t = i / 8;
+const tooth = new THREE.Mesh(GEO.cone, teethMat);
+tooth.scale.set(0.14, 0.55, 0.14);
+tooth.position.set((t - 0.5) * 2.4, 2.9 + Math.cos((t - 0.5) * Math.PI) * 0.25, 8.9);
+tooth.rotation.x = Math.PI;
+g.add(tooth);
+}
+
+// many legs
+for (let i = 0; i < 8; i++) {
+for (const sx of [-1, 1]) {
+const leg = new THREE.Mesh(GEO.cyl, plateMat);
+leg.scale.set(0.22, 3.2, 0.22);
+leg.position.set(sx * 3.6, 1.7, (i - 3.5) * 1.25);
+leg.rotation.z = sx * 0.55;
+g.add(leg);
+}
+}
+
+// spikes on back
+for (let i = 0; i < 10; i++) {
+const spike = new THREE.Mesh(GEO.cone, plateMat);
+spike.scale.set(0.32, 1.5, 0.32);
+spike.position.set(rnd(-1.8, 1.8), 6.6 + rnd(-0.3, 0.5), rnd(-3.5, 3.5));
+g.add(spike);
+}
+
+return g;
+}
+
+function spawnBoss() {
+if (bossActive) return;
+bossActive = true;
+
+const g = createBoss();
+g.position.set(0, 0, -levelLength + 24);
+world.add(g);
+
+boss = {
+group: g,
+hp: CFG.bossMaxHP,
+maxHp: CFG.bossMaxHP,
+speed: 2.4,
+attackCd: 0,
+alive: true,
+phase: 0,
+hurtFlash: 0,
+minionTimer: 8
+};
+
+document.getElementById('bossWrap').style.display = 'block';
+updateBossBar();
+sfxTone(70, 1.4, 'sawtooth', 0.30, 40);
+shakeAmount = 0.5;
+}
+
+function updateBoss(dt) {
+if (!bossActive || !boss || !boss.alive) return;
+
+const g = boss.group;
+boss.phase += dt;
+
+const dx = player.pos.x - g.position.x;
+const dz = player.pos.z - g.position.z;
+const d = Math.hypot(dx, dz);
+
+if (d > 6.5 && d > 0.001) {
+g.position.x += (dx / d) * boss.speed * dt;
+g.position.z += (dz / d) * boss.speed * dt;
+
+let targetRot = Math.atan2(dx, dz);
+let diff = targetRot - g.rotation.y;
+while (diff > Math.PI) diff -= TAU;
+while (diff < -Math.PI) diff += TAU;
+g.rotation.y += diff * Math.min(1, dt * 3);
+}
+
+// breathing
+g.position.y = Math.sin(boss.phase * 1.8) * 0.22;
+g.rotation.z = Math.sin(boss.phase * 1.2) * 0.03;
+
+// contact damage
+if (boss.attackCd > 0) boss.attackCd -= dt;
+if (d < 7.0 && boss.attackCd <= 0) {
+boss.attackCd = 1.9;
+damagePlayer(1);
+}
+
+// spawn minions
+boss.minionTimer -= dt;
+if (boss.minionTimer <= 0) {
+boss.minionTimer = 11;
+for (let i = 0; i < 2; i++) {
+const type = pick(['centipede', 'pillbug', 'tapeworm']);
+const stats = ENEMY_STATS[type];
+const mg = makeEnemyMesh(type);
+const sx = rnd(-8, 8);
+const sz = g.position.z + rnd(-6, 10);
+mg.position.set(sx, 0, sz);
+world.add(mg);
+
+const shadowMat = matCached('enemyShadow', () => new THREE.MeshBasicMaterial({
+color: 0x000000, transparent: true, opacity: 0.34, depthWrite: false
+}));
+const sh = new THREE.Mesh(GEO.plane, shadowMat);
+sh.rotation.x = -Math.PI / 2;
+sh.scale.setScalar(stats.radius * 2.0);
+sh.position.y = 0.04;
+mg.add(sh);
+
+enemies.push({
+type, group: mg,
+speed: stats.speed * 1.15,
+hp: stats.hp, maxHp: stats.hp,
+radius: stats.radius, damage: stats.damage,
+attackCd: 0, phase: srand() * TAU,
+wanderAngle: srand() * TAU, alive: true, baseY: 0
+});
+}
+}
+
+// hurt flash
+if (boss.hurtFlash > 0) boss.hurtFlash -= dt;
+const em = 1.1 + (boss.hurtFlash > 0 ? 3.5 : 0);
+g.traverse(o => {
+if (o.isMesh && o.material && o.material.emissive && o.material === matCache.get('bossBody')) {
+// handled globally below
+}
+});
+const bodyMat = matCache.get('bossBody');
+if (bodyMat) bodyMat.emissiveIntensity = em;
+
+updateBossBar();
+}
+
+function updateBossBar() {
+const fill = document.getElementById('bossFill');
+if (!boss) { fill.style.width = '100%'; return; }
+fill.style.width = (boss.hp / boss.maxHp * 100).toFixed(2) + '%';
+}
+
+function killBoss() {
+if (!boss) return;
+boss.alive = false;
+world.remove(boss.group);
+document.getElementById('bossWrap').style.display = 'none';
+sfxTone(60, 2.2, 'sawtooth', 0.35, 25);
+shakeAmount = 1.2;
+setTimeout(() => winGame(), 900);
+}
+
+/* ==========================================================================
+16. PLAYER DAMAGE / DEATH
+========================================================================== */
+
+function damagePlayer(amount) {
+if (player.invuln > 0 || player.hp <= 0) return;
+
+player.hp -= amount;
+player.invuln = CFG.hitIFrames;
+shakeAmount = Math.max(shakeAmount, 0.35);
+sfxHurt();
+
+const el = document.getElementById('hurtFlash');
+el.style.opacity = '1';
+setTimeout(() => { el.style.opacity = '0'; }, 130);
+
+if (player.hp <= 0) {
+player.hp = 0;
+die();
+}
+}
+
+function die() {
+running = false;
+player.peeing = false;
+setPeeAudio(false);
+document.exitPointerLock && document.exitPointerLock();
+
+const screen = document.getElementById('screen');
+const panel = document.getElementById('screenPanel');
+screen.className = 'dead';
+panel.innerHTML = `
+<div class="title">ВЫ УМЕРЛИ</div>
+<div class="subtitle">THE DISTRICT CONSUMED YOU</div>
+<div class="controls">
+You reached: <b>${LEVELS[levelIndex].name}</b><br>
+Level <b>${levelIndex + 1}</b> of <b>4</b>
+</div>
+<div class="btn" id="restartBtn">ЗАНОВО</div>
+<div class="small">They are still hungry.</div>
+`;
+screen.classList.remove('hidden');
+document.getElementById('restartBtn').addEventListener('click', () => {
+screen.classList.add('hidden');
+startGame();
+});
+}
+
+function winGame() {
+running = false;
+player.peeing = false;
+setPeeAudio(false);
+document.exitPointerLock && document.exitPointerLock();
+
+const screen = document.getElementById('screen');
+const panel = document.getElementById('screenPanel');
+screen.className = 'win';
+panel.innerHTML = `
+<div class="title">ПОБЕДА</div>
+<div class="subtitle">THE MATRIX IS DISSOLVED</div>
+<div class="controls">
+You escaped the metro.<br>
+<b>30 HP</b> — <b>4 districts</b> — <b>1 mother</b> — <b>all of it, peed away.</b>
+</div>
+<div class="btn" id="againBtn">ЕЩЁ РАЗ</div>
+<div class="small">The city exhales.</div>
+`;
+screen.classList.remove('hidden');
+document.getElementById('againBtn').addEventListener('click', () => {
+screen.classList.add('hidden');
+startGame();
+});
+}
+
+/* ==========================================================================
+17. LEVEL TRANSITION
+========================================================================== */
+
+function nextLevel() {
+if (transitioning) return;
+transitioning = true;
+player.peeing = false;
+setPeeAudio(false);
+sfxLevel();
+
+const fade = document.getElementById('fade');
+fade.classList.add('on');
+
+setTimeout(() => {
+const next = levelIndex + 1;
+if (next >= LEVELS.length) {
+winGame();
+transitioning = false;
+fade.classList.remove('on');
+return;
+}
+
+// small mercy heal between districts
+player.hp = Math.min(CFG.maxHP, player.hp + 8);
+
+buildLevel(next);
+fade.classList.remove('on');
+transitioning = false;
+}, 520);
+}
+
+/* ==========================================================================
+18. JUMPSCARE
+========================================================================== */
+
+function triggerJumpscare() {
+const el = document.getElementById('jumpscare');
+el.classList.remove('hidden');
+el.style.animation = 'none';
+void el.offsetWidth; // force reflow to restart animation
+el.style.animation = 'jsZoom 0.95s ease-out forwards';
+
+sfxJumpscare();
+shakeAmount = 0.9;
+
+setTimeout(() => {
+el.classList.add('hidden');
+el.style.animation = 'none';
+}, 1000);
+}
+
+/* ==========================================================================
+19. PLAYER UPDATE
+========================================================================== */
+
+function updatePlayer(dt) {
+// ---- dodge trigger ----
+if (player.dodgeCd > 0) player.dodgeCd -= dt;
+if (player.dodgeTimer > 0) player.dodgeTimer -= dt;
+if (player.invuln > 0) player.invuln -= dt;
+
+// ---- movement input ----
+let f = 0, s = 0;
+if (keys['KeyW'] || keys['ArrowUp']) f += 1;
+if (keys['KeyS'] || keys['ArrowDown']) f -= 1;
+if (keys['KeyD'] || keys['ArrowRight']) s += 1;
+if (keys['KeyA'] || keys['ArrowLeft']) s -= 1;
+
+const mag = Math.hypot(f, s);
+if (mag > 0) { f /= mag; s /= mag; }
+
+const yaw = player.yaw;
+const fwdX = -Math.sin(yaw), fwdZ = -Math.cos(yaw);
+const rgtX = Math.cos(yaw), rgtZ = -Math.sin(yaw);
+
+const dirX = fwdX * f + rgtX * s;
+const dirZ = fwdZ * f + rgtZ * s;
+
+// ---- dodge ----
+if ((keys['Space']) && player.dodgeCd <= 0 && !player.peeing && player.hp > 0) {
+player.dodgeCd = CFG.dodgeCooldown;
+player.dodgeTimer = CFG.dodgeDuration;
+player.invuln = Math.max(player.invuln, CFG.dodgeIFrames);
+
+let dx = dirX, dz = dirZ;
+if (Math.hypot(dx, dz) < 0.01) { dx = fwdX; dz = fwdZ; }
+const dl = Math.hypot(dx, dz);
+player.dodgeDir.set(dx / dl, 0, dz / dl);
+sfxDodge();
+}
+
+// ---- speed ----
+let speed = CFG.walkSpeed;
+if (keys['ShiftLeft'] || keys['ShiftRight']) speed = CFG.sprintSpeed;
+if (player.peeing) speed *= CFG.peeSlowFactor;
+
+let targetX, targetZ;
+if (player.dodgeTimer > 0) {
+targetX = player.dodgeDir.x * CFG.dodgeSpeed;
+targetZ = player.dodgeDir.z * CFG.dodgeSpeed;
+} else {
+targetX = dirX * speed;
+targetZ = dirZ * speed;
+}
+
+// ---- smooth acceleration (frame-rate independent) ----
+const a = 1 - Math.exp(-CFG.accel * dt);
+player.vel.x += (targetX - player.vel.x) * a;
+player.vel.z += (targetZ - player.vel.z) * a;
+
+// ---- integrate ----
+player.pos.x += player.vel.x * dt;
+player.pos.z += player.vel.z * dt;
+
+// ---- collisions ----
+resolveCollisions(player.pos);
+
+// ---- world bounds ----
+player.pos.x = clamp(player.pos.x, -11.5, 11.5);
+player.pos.z = clamp(player.pos.z, -levelLength - 30, 8);
+
+// ---- head bob ----
+const spd = Math.hypot(player.vel.x, player.vel.z);
+player.bobPhase += dt * spd * 1.55;
+
+const bobAmp = Math.min(spd / CFG.sprintSpeed, 1) * 0.058;
+const bobY = Math.sin(player.bobPhase * 2) * bobAmp;
+const bobX = Math.cos(player.bobPhase) * bobAmp * 0.55;
+
+// ---- FOV kick ----
+let targetFov = 75;
+if (spd > CFG.walkSpeed + 0.7) targetFov = 82;
+if (player.dodgeTimer > 0) targetFov = 91;
+if (player.peeing) targetFov = 71;
+player.fov = lerp(player.fov, targetFov, 1 - Math.exp(-9 * dt));
+camera.fov = player.fov;
+camera.updateProjectionMatrix();
+
+// ---- camera roll (subtle) ----
+const strafeRoll = -(player.vel.x * rgtX + player.vel.z * rgtZ) / CFG.sprintSpeed * 0.035;
+player.cameraRoll = lerp(player.cameraRoll, strafeRoll, 1 - Math.exp(-8 * dt));
+
+// ---- camera transform ----
+let camX = player.pos.x + rgtX * bobX;
+let camZ = player.pos.z + rgtZ * bobX;
+let camY = CFG.playerHeight + bobY;
+
+// ---- shake ----
+if (shakeAmount > 0.001) {
+camX += (Math.random() - 0.5) * shakeAmount * 0.55;
+camY += (Math.random() - 0.5) * shakeAmount * 0.55;
+camZ += (Math.random() - 0.5) * shakeAmount * 0.55;
+shakeAmount *= Math.exp(-6.5 * dt);
+} else {
+shakeAmount = 0;
+}
+
+camera.position.set(camX, camY, camZ);
+camera.rotation.set(player.pitch, player.yaw, player.cameraRoll, 'YXZ');
+
+// ---- sun follows player ----
+if (sunLight) {
+sunLight.position.set(player.pos.x - 45, 70, player.pos.z + 25);
+sunLight.target.position.set(player.pos.x, 0, player.pos.z);
+sunLight.target.updateMatrixWorld();
+}
+
+// ---- boss trigger ----
+if (levelIndex === 3 && !bossActive && player.pos.z < -levelLength * 0.55) {
+spawnBoss();
+}
+}
+
+function resolveCollisions(p) {
+const r = CFG.playerRadius;
+
+for (let i = 0; i < colliders.length; i++) {
+const c = colliders[i];
+
+const overlapX = (p.x + r) - c.x1;
+const overlapX2 = c.x2 - (p.x - r);
+const overlapZ = (p.z + r) - c.z1;
+const overlapZ2 = c.z2 - (p.z - r);
+
+if (overlapX <= 0 || overlapX2 <= 0 || overlapZ <= 0 || overlapZ2 <= 0) continue;
+
+const minOverlap = Math.min(overlapX, overlapX2, overlapZ, overlapZ2);
+
+if (minOverlap === overlapX) p.x -= overlapX;
+else if (minOverlap === overlapX2) p.x += overlapX2;
+else if (minOverlap === overlapZ) p.z -= overlapZ;
+else p.z += overlapZ2;
+}
+}
+
+/* ==========================================================================
+20. ENVIRONMENT ANIMATION (flicker)
+========================================================================== */
+
+function updateEnvironment(dt, time) {
+for (let i = 0; i < lamps.length; i++) {
+const l = lamps[i];
+if (!l) continue;
+
+const flicker = 0.88 + Math.sin(time * 11 + l.phase) * 0.07
++ Math.sin(time * 27.3 + l.phase * 2.1) * 0.05;
+
+if (l.light) {
+l.light.intensity = l.lightBase * flicker;
+}
+if (l.mesh && l.mesh.material) {
+// shared material — modulate once per frame only
+}
+}
+
+// subtle global flicker on emissive lamp material
+const bulbMat = matCache.get('__unused__');
+void bulbMat;
+}
+
+/* ==========================================================================
+21. HUD UPDATE
+========================================================================== */
+
+const elHpFill = document.getElementById('hpFill');
+const elHpText = document.getElementById('hpText');
+const elPeeFill = document.getElementById('peeFill');
+const elDodgeFill = document.getElementById('dodgeFill');
+const elCrosshair = document.getElementById('crosshair');
+
+function updateHUD() {
+// health
+const hpPct = clamp(player.hp / CFG.maxHP, 0, 1);
+elHpFill.style.width = (hpPct * 100) + '%';
+elHpText.textContent = Math.max(0, Math.ceil(player.hp)) + ' / ' + CFG.maxHP;
+
+// pee meter
+if (bossActive) {
+elPeeFill.style.width = '100%';
+elPeeFill.style.background =
+'linear-gradient(90deg,#4a0010,#c0142b 50%,#ff4444)';
+} else {
+const pct = clamp(player.peeCharge / player.peeGoal, 0, 1);
+elPeeFill.style.width = (pct * 100) + '%';
+elPeeFill.style.background =
+'linear-gradient(90deg,#8a7a20,#ffe066 50%,#fff5b0)';
+}
+
+// dodge cooldown
+const dodgePct = clamp(1 - player.dodgeCd / CFG.dodgeCooldown, 0, 1);
+elDodgeFill.style.width = (dodgePct * 100) + '%';
+elDodgeFill.style.background = dodgePct >= 1 ? '#4fc3f7' : '#2a5a6a';
+
+// crosshair pulse while peeing
+elCrosshair.style.opacity = pointerLocked ? '1' : '0.25';
+}
+
+/* ==========================================================================
+22. INPUT HANDLERS
+========================================================================== */
+
+addEventListener('keydown', (e) => {
+keys[e.code] = true;
+if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'ArrowDown') {
+e.preventDefault();
+}
+});
+
+addEventListener('keyup', (e) => {
+keys[e.code] = false;
+});
+
+addEventListener('blur', () => {
+for (const k in keys) keys[k] = false;
+player.peeing = false;
+});
+
+document.addEventListener('mousemove', (e) => {
+if (!pointerLocked || !running || paused) return;
+
+player.yaw -= e.movementX * CFG.sensitivity;
+player.pitch -= e.movementY * CFG.sensitivity;
+player.pitch = clamp(player.pitch, -Math.PI / 2 + 0.02, Math.PI / 2 - 0.02);
+
+// keep yaw bounded
+if (player.yaw > Math.PI) player.yaw -= TAU;
+if (player.yaw < -Math.PI) player.yaw += TAU;
+});
+
+document.addEventListener('mousedown', (e) => {
+if (e.button !== 0) return;
+if (!running || paused) return;
+
+if (!pointerLocked) {
+renderer.domElement.requestPointerLock();
+return;
+}
+player.peeing = true;
+});
+
+document.addEventListener('mouseup', (e) => {
+if (e.button === 0) player.peeing = false;
+});
+
+document.addEventListener('pointerlockchange', () => {
+pointerLocked = (document.pointerLockElement === renderer.domElement);
+
+if (!pointerLocked && running) {
+paused = true;
+player.peeing = false;
+setPeeAudio(false);
+showPauseOverlay();
+} else if (pointerLocked) {
+paused = false;
+}
+});
+
+/* pause overlay */
+function showPauseOverlay() {
+const screen = document.getElementById('screen');
+const panel = document.getElementById('screenPanel');
+screen.className = '';
+panel.innerHTML = `
+<div class="title" style="letter-spacing:10px;">ПАУЗА</div>
+<div class="subtitle">PAUSED</div>
+<div class="controls">
+<b>WASD</b> move &nbsp;•&nbsp; <b>MOUSE</b> look<br>
+<b>HOLD LEFT MOUSE</b> pee &nbsp;•&nbsp; <b>SHIFT</b> sprint &nbsp;•&nbsp; <b>SPACE</b> dodge
+</div>
+<div class="btn" id="resumeBtn">ПРОДОЛЖИТЬ</div>
+`;
+screen.classList.remove('hidden');
+
+document.getElementById('resumeBtn').addEventListener('click', () => {
+screen.classList.add('hidden');
+renderer.domElement.requestPointerLock();
+});
+}
+
+/* ==========================================================================
+23. MAIN LOOP
+========================================================================== */
+
+const clock = new THREE.Clock();
+let elapsed = 0;
+
+function animate() {
+requestAnimationFrame(animate);
+
+const dt = Math.min(clock.getDelta(), 0.05);
+elapsed += dt;
+
+if (running && !paused) {
+updatePlayer(dt);
+updateEnemies(dt);
+updatePickups(dt);
+updateBoss(dt);
+updatePee(dt);
+updateEnvironment(dt, elapsed);
+
+// jumpscare every 40 seconds
+jumpscareTimer += dt;
+if (jumpscareTimer >= CFG.jumpscareEvery) {
+jumpscareTimer = 0;
+triggerJumpscare();
+}
+
+updateHUD();
+}
+
+renderer.render(scene, camera);
+}
+
+/* ==========================================================================
+24. GAME START
+========================================================================== */
+
+function startGame() {
+initAudio();
+
+player.hp = CFG.maxHP;
+player.invuln = 0;
+player.peeing = false;
+player.peeCharge = 0;
+player.fov = 75;
+player.bobPhase = 0;
+player.cameraRoll = 0;
+shakeAmount = 0;
+jumpscareTimer = 0;
+transitioning = false;
+
+buildLevel(0);
+
+running = true;
+paused = false;
+
+document.getElementById('screen').classList.add('hidden');
+document.getElementById('bossWrap').style.display = 'none';
+document.getElementById('hurtFlash').style.opacity = '0';
+
+renderer.domElement.requestPointerLock();
+}
+
+document.getElementById('startBtn').addEventListener('click', startGame);
+
+/* boot: render an empty scene behind the title screen */
+scene.background = new THREE.Color(0x0a0d10);
+scene.fog = new THREE.Fog(0x0a0d10, 20, 120);
+const bootAmb = new THREE.AmbientLight(0x8899aa, 0.6);
+scene.add(bootAmb);
+
+clock.start();
+animate();
+</script>
+</body>
+</html>
